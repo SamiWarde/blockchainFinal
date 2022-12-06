@@ -63,3 +63,80 @@ class Blockchain(object):
 app = Flask(__name__)
 node_identifier = str(uuid4()).replace('-',"")
 blockchain = Blockchain()
+
+
+@app.route('/blockchain', methods=['GET'])
+def full_chain():
+    response = {
+        'chain': blockchain.chain,
+        'length': len(blockchain.chain)
+        }
+    return jsonify(response), 200
+@app.route('/mine', methods=['GET'])
+def mine_block():
+    blockchain.add_transaction(
+        sender = "0",
+        patient = None,
+        healthInfo = None,
+        )
+    last_block_hash = blockchain.Block_Hash(blockchain.last_block)
+    
+    index = len(blockchain.chain)
+    t1 = time()
+    nonce = blockchain.PoW(index,last_block_hash,blockchain.current_transaction)
+    t2 = time()
+    block = blockchain.append_block(nonce,last_block_hash)
+    tTime = t2-t1
+    response = {
+        'message': "new block has been added (mined)",
+        'index': block['index'],
+        'hash_of_previous_block': block['Previous_block_hash'],
+        'nonce':block['nonce'],
+        'transaction':block['transactions'],
+        'time taken in seconds':tTime
+        }
+    return jsonify(response), 200
+@app.route('/transactions/new', methods=['POST'])
+def new_transactions():
+    values = request.get_json()
+    required_fields = ['sender','patient','healthInfo']
+    if not all (k in values for k in required_fields):
+        return ('Missing Fields', 400)
+    index = blockchain.add_transaction(
+        values['sender'],
+        values['patient'],
+        values['healthInfo'],
+        )
+    response = {'message': f'Transaction will be added to the block {index}'}
+    return (jsonify(response),201)
+
+@app.route('/transactions', methods=['GET'])
+def transactions():
+    k = blockchain.transactions()
+    return(jsonify(k), 200)
+    
+
+@app.route('/search', methods=['POST'])
+def searchP():
+    values = request.get_json()
+    required_fields = ['name']
+    if not all (k in values for k in required_fields):
+        return ('Missing Fields', 400)
+    response = {
+        'chain': blockchain.chain,
+        'length': len(blockchain.chain)
+        }
+    sendBack = []
+    for i in response['chain']:
+        for k,v in i.items():
+            if(k == 'transactions'):
+                for l in v:
+                    if((l['patient'] == values['name']) or (l['sender'] == values['name']) ):
+                        sendBack.append(l)
+    return jsonify(sendBack), 201
+
+
+
+
+if __name__=='__main__':
+    app.run(host='0.0.0.0', port=int(8080))
